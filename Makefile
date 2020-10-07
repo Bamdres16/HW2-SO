@@ -1,1 +1,2 @@
-gcc mycall.c -o mycall
+main:
+	gcc mycall.c -o mycall
