@@ -35,10 +35,8 @@ int main(int argc, char *argv[])
     {
         struct stat sb;
         char exec[1000];
-
         strcpy(exec, argv[2]);
         strcat(exec, " ");
-
         // Add executable parameters
         for (int i = 3; i < argc; i++)
         {
@@ -59,7 +57,10 @@ int main(int argc, char *argv[])
             if (child == 0)
             {
                 ptrace(PTRACE_TRACEME, 0, NULL, NULL);
-                execvp(exec, argv + 1);
+                if (execvp(argv[2], argv + 2) == 0) {
+                    printf("Error %s can't execute", argv[2]);
+                    exit(0);
+                }
             }
             else if (child == -1)
             {
