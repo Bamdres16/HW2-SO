@@ -10,6 +10,7 @@
 #include <sys/reg.h>
 #include <sys/user.h>
 #include <time.h>
+#include <errno.h>
 #include "callname.c"
 #define TRUE 1
 
@@ -57,10 +58,10 @@ int main(int argc, char *argv[])
             if (child == 0)
             {
                 ptrace(PTRACE_TRACEME, 0, NULL, NULL);
-                if (execvp(argv[2], argv + 2) == 0) {
-                    printf("Error %s can't execute", argv[2]);
-                    exit(0);
-                }
+                execvp(argv[2], argv + 2);
+                printf("Error %s can't execute\n", argv[2]);
+                exit(0);
+            
             }
             else if (child == -1)
             {
@@ -72,12 +73,20 @@ int main(int argc, char *argv[])
                 int status;
                 struct user_regs_struct regs;
                 int in_call = FALSE;
+                clock_t localstart, localend;
+                double taken, elapsed = 0;
                 while (waitpid(child, &status, 0) && !WIFEXITED(status))
                 {
+                    taken = 0;
                     if (!in_call)
                     {
+                        localstart = clock();
                         ptrace(PTRACE_GETREGS, child, NULL, &regs);
-                        printf("[%s] the program used the system call:  %s\n", get_time(), callname(REG(regs)));
+                        
+                        if (REG(regs) == -1) { 
+                            printf ("Error during %s execution.\n", argv[2]);
+                            exit(0);
+                        }
                         calls++;
                         ptrace(PTRACE_SYSCALL, child, NULL, NULL);
                         in_call = TRUE;
@@ -85,12 +94,18 @@ int main(int argc, char *argv[])
                     else
                     {
                         ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+                        localend = clock();
+                        taken = (double) (localend - localstart) / CLOCKS_PER_SEC;
+                        elapsed += taken;
+                        printf("%d. %s used the system call: %s ", calls, argv[2], 
+                        callname(REG(regs)));
+                        printf("(time taken: %f, elapsed time: %f)\n", taken,elapsed);
                         in_call = FALSE;
                     }
                 }
+                printf("%50s\n", "------------------- END ---------------");
+                printf("Total calls: %d. Elapsed time: %lf.\n", calls, elapsed);
             }
-            printf("%50s\n", "------------------- END ---------------");
-            printf("Total calls: %d\n", calls);
         }
         // ==================== AUTOMATIC MODE ====================
         else if (strcmp(argv[1], "-a") == 0)
